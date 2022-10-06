@@ -14,6 +14,7 @@ class UInventoryComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	UInventoryComponent();
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void InitInventory(const int32& InventorySize);
@@ -40,7 +41,7 @@ public:
 private:
 
 	UPROPERTY()
-	UDataTable* ItemTable;
+	const UDataTable* ItemTable;
 
 	UPROPERTY()
 	TArray<FInventoryItemData> Inventory;

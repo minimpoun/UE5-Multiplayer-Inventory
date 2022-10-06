@@ -5,3 +5,8 @@ DerivedDataCache/
 Intermediate/
 Saved/
 *.sln
+.idea
+Platforms/
+Plugins/*/Intermediate
+Plugins/*/Binaries
+Plugins/Developer/*

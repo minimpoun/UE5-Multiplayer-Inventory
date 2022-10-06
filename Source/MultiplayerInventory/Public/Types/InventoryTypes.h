@@ -13,10 +13,14 @@ struct FInventoryItemData : public FTableRowBase
 public:
 
 	FInventoryItemData()
-	{
-		ItemID = NAME_None;
-		ItemIcon = nullptr;
-	}
+		: ItemIcon(nullptr)
+		, Price(0)
+		, Weight(0)
+		, MaxStackAmount(0)
+		, Amount(0)
+		, bUniqueItem(0)
+		, bStackable(0)
+	{}
 
 	FORCEINLINE bool IsValid() const { return ItemID != NAME_None && ItemIcon; }
 
@@ -27,7 +31,7 @@ public:
 	FText DisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FText Discription;
+	FText Description;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UTexture2D* ItemIcon;
@@ -39,7 +43,7 @@ public:
 	int32 Weight;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 MaxStackSize;
+	int32 MaxStackAmount;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Amount;
@@ -49,6 +53,16 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bUniqueItem == false"))
 	uint8 bStackable:1;
+
+	FString ToString() const
+	{
+		FString OutString;
+		OutString += "{\n	ItemID: " + ItemID.ToString() + "; \n";
+		OutString += "	Stack: " + FString::FromInt(Amount) + "; \n";
+		OutString += "	MaxStackAmount: " + FString::FromInt(MaxStackAmount) + ";\n}";
+
+		return OutString;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -63,7 +77,7 @@ public:
 	{
 		ItemID = InData.ItemID;
 		ItemIcon = InData.ItemIcon;
-		ItemDiscreption = InData.Discription;
+		ItemDiscreption = InData.Description;
 		ItemName = InData.DisplayName;
 	}
 
@@ -78,4 +92,23 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText ItemName;
+};
+
+USTRUCT(BlueprintType)
+struct FInventoryJson
+{
+	GENERATED_BODY()
+
+public:
+
+	FORCEINLINE bool IsValid() const { return !ItemID.IsEmpty() && SlotID > -1; }
+
+	UPROPERTY(BlueprintReadOnly)
+	FString ItemID;
+
+	UPROPERTY(BlueprintReadOnly)
+	int32 Stack;
+
+	UPROPERTY(BlueprintReadOnly)
+	int32 SlotID;
 };

@@ -6,21 +6,23 @@
 
 #include "InventoryManagerComponent.generated.h"
 
-class UDataTable;
 class UInventoryComponent;
+class UDataTable;
+class UInventoryEquipmentComponent;
 
 USTRUCT()
 struct FClientAddItemData
 {
 	GENERATED_BODY()
 
-public:
+	FClientAddItemData(): Index(0), AddAmount(0)
+	{
+	}
 
-	FClientAddItemData(){}
 	FClientAddItemData(const int32& NewIndex, const int32& NewAmount, const FClientInventoryItem& NewClientData)
 	{
 		Index = NewIndex;
-		Amount = NewAmount;
+		AddAmount = NewAmount;
 		ClientUIData = NewClientData;
 	}
 
@@ -28,7 +30,7 @@ public:
 	int32 Index;
 
 	UPROPERTY()
-	int32 Amount;
+	int32 AddAmount;
 
 	UPROPERTY()
 	FClientInventoryItem ClientUIData;
@@ -40,82 +42,115 @@ class UInventoryManagerComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
-	
 	UInventoryManagerComponent();
 
-	virtual void SetInventoryComponent(UInventoryComponent* InPlayerInventory);
+	/** [client] */
+	DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnUpdateInventorySlot, const int32&, const int32&, const FClientInventoryItem&);
+	FOnUpdateInventorySlot OnUpdateInventorySlot;
+
+	/** [client] */
+	DECLARE_MULTICAST_DELEGATE_TwoParams(FOnMoveInventoryItems, const int32&, const int32&);
+	FOnMoveInventoryItems OnMoveInventoryItems;
+
+	/** [client] */
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnClearInventoryItems, const int32&);
+	FOnClearInventoryItems OnClearInventoryItems;
+
+	/** [client] */
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnRefreshSlots, const TArray<int32>&);
+	FOnRefreshSlots OnRefreshSlots;
+
+	/** [client] */
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnDisplayToast, const FText&);
+	FOnDisplayToast OnDisplayToast;
+
+	virtual void SetInventoryComponent(UInventoryComponent* InInventory);
 	virtual void SetItemDataTable(const UDataTable* NewDataTable);
-	//virtual void SetupGameHUD()
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_InitInventory();
 
+	UPROPERTY(Replicated, BlueprintReadOnly)
+	int32 InventorySize = 30;
+
+	/************************************************************************/
+	/* Player Inventory                                                     */
+	/************************************************************************/
+	
 	UFUNCTION(BlueprintCallable)
-	void AddItem(const int32& Amount, const FName& Item);
+	void AddInventoryItem(const int32& Amount, const FName& Item);
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveItem(const int32& Amount, const int32& SlotID);
+	void RemoveInventoryItem(const int32& Amount, const int32& Slot);
+
+	void SplitInventoryStack(const int32& Slot, const int32& NewSlot);
 
 	UFUNCTION(BlueprintCallable)
-	void SplitStack(const int32& SlotID, const int32& NewSlot);
+	void ClearInventoryItem(const int32& Slot);
 
 	UFUNCTION(BlueprintCallable)
-	void ClearInventoryItem(const int32& SlotID);
+	void MoveInventoryItem(const int32& FromSlot, const int32& ToSlot);
 
-	UFUNCTION(BlueprintCallable)
-	void ClearInventory();
-
-	UFUNCTION(BlueprintCallable)
-	void MoveItem(const int32& FromSlot, const int32& ToSlot);
+	FInventoryItemData GetItemDataFromID(const FName& ItemID) const;
 
 	UFUNCTION(BlueprintCallable)
 	TArray<int32> SearchForItemsByID(FName ID);
 
+	UFUNCTION(Server, WithValidation, Reliable)
+	void InitInventoryFromDatabase(const TArray<FInventoryJson>& InventoryJson);
+
 	UFUNCTION(BlueprintCallable)
-	FInventoryItemData GetItemDataFromID(const FName& ItemID) const;
-
-#if WITH_EDITOR
-	UFUNCTION()
 	void PrintInventory();
-#endif // WITH_EDITOR
-
-	UPROPERTY(Replicated, BlueprintReadOnly)
-	int32 InventorySize = 32;
 
 protected:
 
-	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_AddItem(const int32& Amount, const FName& Item);
+	UFUNCTION(Server, Unreliable, WithValidation)
+	void Server_PrintInventory();
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_RemoveItem(const int32& Amount, const int32& SlotID);
+	void Server_AddInventoryItem(const int32& Amount, const FName& Item);
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_SplitStack(const int32& SlotID, const int32& NewSlot);
+	void Server_RemoveInventoryItem(const int32& Amount, const int32& Slot);
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_ClearInventoryItem(const int32& SlotID);
+	void Server_SplitInventoryStack(const int32& Slot, const int32& NewSlot);
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_ClearInventory();
+	void Server_ClearInventoryItem(const int32& Slot);
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_MoveItem(const int32& FromSlot, const int32& ToSlto);
+	void Server_MoveInventoryItem(const int32& FromSlot, const int32& ToSlot);
 
-	UFUNCTION(Client, Unreliable)
-	void Client_UpdateSlot(const int32& SlotID, const int32& Amount, const FClientInventoryItem& NewUIData);
+	UFUNCTION(Client, Reliable)
+	void Client_DisplayToast(const FText& Msg);
 
-	UFUNCTION(Client, Unreliable)
+	UFUNCTION(Client, Reliable)
+	void Client_ClearItem(const int32& Slot);
+
+	UFUNCTION(Client, Reliable)
+	void Client_AddInventoryItem(const int32& Slot, const int32& Amount, const FClientInventoryItem& Item);
+
+	UFUNCTION(Client, Reliable)
+	void Client_RefreshSlots(const TArray<int32>& SlotsToUpdate);
+
+	UFUNCTION(Client, Reliable)
+	void Client_UpdateSlot(const int32& Slot, const int32& Amount, const FClientInventoryItem& UIData);
+
+	UFUNCTION(Client, Reliable)
 	void Client_UpdateSlots(const TArray<FClientAddItemData>& NewItemRequests);
+	
+	UFUNCTION(Client, Reliable)
+	void Client_MoveInventoryItem(const int32& FromSlot, const int32& ToSlot);
 
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) override;
-
+	//~ Begin UActorComponent Interface
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	//~ End UActorComponent Interface
+	
+	UPROPERTY()
+	const UDataTable* ItemDataTable;
+	
 private:
 
-	UPROPERTY()
-	UInventoryComponent* PlayerInventory;
-
-	UPROPERTY()
-	UDataTable* ItemDataTable;
-
+	TObjectPtr<UInventoryComponent> PlayerInventory;
 };
